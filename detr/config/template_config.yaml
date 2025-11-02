@@ -1,0 +1,20 @@
+ARTIFACTS_DIR: "artifacts"
+MODEL:
+  MODEL_CONFIG: 1
+DATA:
+  root_dir: "data/"
+  img_size: [512, 512]
+  batch_size: 8
+OPTIM:
+  optimizer: "Adam"
+  lr: 0.001
+  accumulate_gradient: False
+  accumulate_gradient_iters: 8
+  num_epochs: 100
+  max_eval_iters: 50
+  save_ckpt_every: 1
+  eval_every: 1
+  gradient_clip: False
+  scheduler: ""
+  T_max: 100
+  eta_min: 0.000001
