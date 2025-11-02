@@ -5,7 +5,8 @@ import torch
 from torch.utils.data import DataLoader, Subset
 from torch.utils.tensorboard import SummaryWriter
 
-from flownet.utils.misc import get_device
+from detr.utils.misc import get_device
+from detr.dataset.voc_dataset import voc_collate_fn
 
 
 class TrainerBase(ABC):
@@ -108,7 +109,11 @@ class TrainerBase(ABC):
         self.data_config = data_config
 
         self.train_loader = DataLoader(
-            self.train_dataset, batch_size=data_config["batch_size"], shuffle=True, drop_last=True
+            self.train_dataset,
+            batch_size=data_config["batch_size"],
+            shuffle=True,
+            drop_last=True,
+            collate_fn=voc_collate_fn,
         )
         if shuffle_valset_once:
             val_indices = torch.randperm(len(self.val_dataset))
@@ -118,6 +123,7 @@ class TrainerBase(ABC):
             batch_size=val_set_batch_size if val_set_batch_size is not None else data_config["batch_size"],
             shuffle=shuffle_valset,
             drop_last=True,
+            collate_fn=voc_collate_fn,
         )
         self.logger.info(f"Train Dataset: {self.train_dataset}")
         self.logger.info(f"Val Dataset: {self.val_dataset}")

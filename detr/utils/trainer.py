@@ -21,24 +21,22 @@ class Trainer(TrainerBase):
     def train_one_epoch(self):
         self.model.train()
         pbar = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
-        for n_iter, (img, labels) in pbar:
+        for n_iter, (img, targets) in pbar:
             img = img.to(self.device)
-            labels = labels.to(self.device)
-
             preds = self.model(img)
-            loss, loss_dict = self.loss_fn(preds, labels)
+            loss, loss_dict = self.loss_fn(preds, targets)
             self.write_dict_to_tb(loss_dict, self.total_iters_train, prefix="train")
 
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
+            # self.optimizer.zero_grad()
+            # loss.backward()
+            # self.optimizer.step()
 
             self.total_iters_train += 1
             pbar.set_postfix(
                 {
                     "mode": "train",
                     "epoch": f"{self.epoch}/{self.config['OPTIM']['num_epochs']}",
-                    "loss": loss.item(),
+                    # "loss": loss.item(),
                 }
             )
         pbar.close()

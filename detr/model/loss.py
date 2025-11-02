@@ -15,10 +15,9 @@ class BaseLoss(nn.Module):
 class DetrLoss(BaseLoss):
     def __init__(self, config, logger):
         super(DetrLoss, self).__init__(config, logger)
-        self.loss_fn = nn.MSELoss()
 
-    def forward(self, preds, labels):
-        loss = self.loss_fn(preds, labels)
+    def forward(self, preds,targets):
+        loss = 0
 
         loss_dict = {}
         loss_dict["loss"] = loss

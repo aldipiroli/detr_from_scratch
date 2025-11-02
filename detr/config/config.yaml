@@ -3,7 +3,7 @@ MODEL:
   MODEL_CONFIG: 1
 DATA:
   root_dir: "data/"
-  img_size: [512, 512]
+  img_size: [256, 256]
   batch_size: 8
 OPTIM:
   optimizer: "Adam"
