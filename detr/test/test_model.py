@@ -4,13 +4,25 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import torch
 
-from detr.model.model import DetrModel, EncoderBlock, Encoder, DecoderBlock, Decoder
+from detr.model.model import DetrModel, EncoderBlock, Encoder, DecoderBlock, Decoder, DetrModelDYI
 from detr.utils.misc import load_config
 
 
 def test_model():
     config = load_config("detr/config/config.yaml")
     model = DetrModel(config)
+    img_size = config["DATA"]["img_size"]
+    dec_n_queries = config["MODEL"]["dec_n_queries"]
+    B, C, H, W = 2, 3, img_size[0], img_size[1]
+    img = torch.randn(B, C, H, W)
+    boxes, cls = model(img)
+    assert boxes.shape == (B, dec_n_queries, 4)
+    assert cls.shape == (B, dec_n_queries, 1)
+
+
+def test_model_dyi():
+    config = load_config("detr/config/config.yaml")
+    model = DetrModelDYI(config)
     img_size = config["DATA"]["img_size"]
     dec_n_queries = config["MODEL"]["dec_n_queries"]
     B, C, H, W = 2, 3, img_size[0], img_size[1]
@@ -64,6 +76,7 @@ def test_decoder_block():
     out = decoder_block(queries, pos_encodings, memory)
     assert out.shape == (B, n_queries, embed_dim)
 
+
 def test_decoder_layers():
     embed_dim = 64
     n_heads = 2
@@ -80,6 +93,7 @@ def test_decoder_layers():
 
     out = decoder(queries, memory, pos_encodings)
     assert out.shape == (B, n_queries, embed_dim)
+
 
 if __name__ == "__main__":
     print("All tests passed!")

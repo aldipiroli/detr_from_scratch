@@ -176,7 +176,7 @@ class Decoder(nn.Module):
         return queries
 
 
-class DETRModelDYI(BaseModel):
+class DetrModelDYI(BaseModel):
     def __init__(self, config):
         super().__init__(config)
         self.d = config["MODEL"]["d"]
@@ -187,5 +187,29 @@ class DETRModelDYI(BaseModel):
         self.dec_n_layers = config["MODEL"]["dec_n_layers"]
         self.dec_n_queries = config["MODEL"]["dec_n_queries"]
 
+        self.backbone = ResNet18Backbone()
+        self.feat_reduction = nn.Conv2d(512, self.d, 1)
+
+        self.encoder = Encoder(self.d, self.enc_n_heads, self.enc_n_layers)
+        self.decoder = Decoder(self.d, self.dec_n_heads, self.dec_n_layers)
+        self.positional_embeddings = nn.Parameter(torch.rand(1, self.n_patches, self.d))
+        self.obj_queries = nn.Parameter(torch.rand(1, self.dec_n_queries, self.d))
+
+        self.box_head = nn.Sequential(nn.Linear(self.d, self.d), nn.ReLU(), nn.Linear(self.d, 4))
+        self.cls_head = nn.Sequential(nn.Linear(self.d, self.d), nn.ReLU(), nn.Linear(self.d, 1))
+
     def forward(self, x):
-        pass
+        B = x.shape[0]
+        x = self.backbone(x)
+        x = self.feat_reduction(x)
+        x = x.flatten(2, 3)  # B, d, HW
+        x = x.permute(0, 2, 1)
+        pose_embed = self.positional_embeddings.repeat(B, 1, 1)
+        memory = self.encoder(x, pose_embed)
+
+        queries = self.obj_queries.repeat(B, 1, 1)
+        x = self.decoder(queries, memory, pose_embed)
+
+        boxes = self.box_head(x)
+        cls = self.cls_head(x)
+        return boxes, cls
