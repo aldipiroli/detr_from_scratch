@@ -4,7 +4,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import torch
 
-from detr.model.model import DetrModel
+from detr.model.model import DetrModel, EncoderBlock, Encoder
 from detr.utils.misc import load_config
 
 
@@ -18,6 +18,34 @@ def test_model():
     boxes, cls = model(img)
     assert boxes.shape == (B, dec_n_queries, 4)
     assert cls.shape == (B, dec_n_queries, 1)
+
+def test_encoder_block():
+    embed_dim = 64
+    n_heads = 2
+    B = 8
+    n_patches = 72
+
+    encoder_block = EncoderBlock(embed_dim, n_heads)
+
+    img_feats = torch.randn(B, n_patches, embed_dim)
+    pos_encodings = torch.rand(B, n_patches, embed_dim)
+    out = encoder_block(img_feats, pos_encodings)
+    assert out.shape == (B, n_patches, embed_dim)
+
+
+def test_encoder_layers():
+    embed_dim = 64
+    n_heads = 2
+    B = 8
+    n_patches = 72
+    n_layers = 2
+
+    encoder = Encoder(embed_dim, n_heads, n_layers)
+
+    img_feats = torch.randn(B, n_patches, embed_dim)
+    pos_encodings = torch.rand(B, n_patches, embed_dim)
+    out = encoder(img_feats, pos_encodings)
+    assert out.shape == (B, n_patches, embed_dim)
 
 
 if __name__ == "__main__":

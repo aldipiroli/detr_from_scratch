@@ -88,3 +88,60 @@ class DetrModel(BaseModel):
         boxes = self.box_head(x)
         cls = self.cls_head(x)
         return boxes, cls
+
+
+class EncoderBlock(nn.Module):
+    def __init__(self, embed_dim, num_heads):
+        super().__init__()
+        self.K = nn.Linear(embed_dim, embed_dim)
+        self.Q = nn.Linear(embed_dim, embed_dim)
+        self.V = nn.Linear(embed_dim, embed_dim)
+        self.mhsa = nn.MultiheadAttention(embed_dim, num_heads, batch_first=True)
+        self.layer_norm1 = nn.LayerNorm(embed_dim)
+        self.layer_norm2 = nn.LayerNorm(embed_dim)
+        self.ffn = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim),
+            nn.ReLU(),
+            nn.Linear(embed_dim, embed_dim),
+        )
+
+    def forward(self, x, pos_encodings):
+        x_in = x + pos_encodings
+        k = self.K(x_in)
+        q = self.Q(x_in)
+        v = self.V(x_in)
+
+        x_att, _ = self.mhsa(q, k, v)
+        x_mid = x_att + x_in
+        x_mid = self.layer_norm1(x_mid)
+        x_ffn = self.ffn(x_mid)
+        x_out = x_ffn + x_mid
+        x_out = self.layer_norm2(x_out)
+        return x_out
+
+
+class Encoder(nn.Module):
+    def __init__(self, embed_dim, n_heads, n_layers):
+        super().__init__()
+        self.n_layers = n_layers
+        self.encoder_blocks = [EncoderBlock(embed_dim, n_heads) for _ in range(n_layers)]
+
+    def forward(self, x, pos_encodings):
+        for block in self.encoder_blocks:
+            x = block(x, pos_encodings)
+        return x
+
+
+class DETRModelDYI(BaseModel):
+    def __init__(self, config):
+        super().__init__(config)
+        self.d = config["MODEL"]["d"]
+        self.n_patches = config["MODEL"]["n_patches"]
+        self.enc_n_heads = config["MODEL"]["enc_n_heads"]
+        self.enc_n_layers = config["MODEL"]["enc_n_layers"]
+        self.dec_n_heads = config["MODEL"]["dec_n_heads"]
+        self.dec_n_layers = config["MODEL"]["dec_n_layers"]
+        self.dec_n_queries = config["MODEL"]["dec_n_queries"]
+
+    def forward(self, x):
+        pass
