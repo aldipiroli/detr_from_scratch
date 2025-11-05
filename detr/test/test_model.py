@@ -4,7 +4,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import torch
 
-from detr.model.model import DetrModel, EncoderBlock, Encoder
+from detr.model.model import DetrModel, EncoderBlock, Encoder, DecoderBlock, Decoder
 from detr.utils.misc import load_config
 
 
@@ -18,6 +18,7 @@ def test_model():
     boxes, cls = model(img)
     assert boxes.shape == (B, dec_n_queries, 4)
     assert cls.shape == (B, dec_n_queries, 1)
+
 
 def test_encoder_block():
     embed_dim = 64
@@ -47,6 +48,38 @@ def test_encoder_layers():
     out = encoder(img_feats, pos_encodings)
     assert out.shape == (B, n_patches, embed_dim)
 
+
+def test_decoder_block():
+    embed_dim = 64
+    n_heads = 2
+    B = 8
+    n_patches = 72
+    n_queries = 10
+
+    decoder_block = DecoderBlock(embed_dim, n_heads)
+
+    queries = torch.randn(B, n_queries, embed_dim)
+    pos_encodings = torch.rand(B, n_patches, embed_dim)
+    memory = torch.rand(B, n_patches, embed_dim)
+    out = decoder_block(queries, pos_encodings, memory)
+    assert out.shape == (B, n_queries, embed_dim)
+
+def test_decoder_layers():
+    embed_dim = 64
+    n_heads = 2
+    B = 8
+    n_patches = 72
+    n_layers = 2
+    n_queries = 10
+
+    decoder = Decoder(embed_dim, n_heads, n_layers)
+
+    memory = torch.randn(B, n_patches, embed_dim)
+    pos_encodings = torch.rand(B, n_patches, embed_dim)
+    queries = torch.randn(B, n_queries, embed_dim)
+
+    out = decoder(queries, memory, pos_encodings)
+    assert out.shape == (B, n_queries, embed_dim)
 
 if __name__ == "__main__":
     print("All tests passed!")

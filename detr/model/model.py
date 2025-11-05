@@ -107,11 +107,7 @@ class EncoderBlock(nn.Module):
 
     def forward(self, x, pos_encodings):
         x_in = x + pos_encodings
-        k = self.K(x_in)
-        q = self.Q(x_in)
-        v = self.V(x_in)
-
-        x_att, _ = self.mhsa(q, k, v)
+        x_att, _ = self.mhsa(x_in, x_in, x_in)
         x_mid = x_att + x_in
         x_mid = self.layer_norm1(x_mid)
         x_ffn = self.ffn(x_mid)
@@ -130,6 +126,54 @@ class Encoder(nn.Module):
         for block in self.encoder_blocks:
             x = block(x, pos_encodings)
         return x
+
+
+class DecoderBlock(nn.Module):
+    def __init__(self, embed_dim, num_heads):
+        super().__init__()
+        self.K = nn.Linear(embed_dim, embed_dim)
+        self.Q = nn.Linear(embed_dim, embed_dim)
+        self.V = nn.Linear(embed_dim, embed_dim)
+        self.mhsa1 = nn.MultiheadAttention(embed_dim, num_heads, batch_first=True)
+        self.mhsa2 = nn.MultiheadAttention(embed_dim, num_heads, batch_first=True)
+        self.layer_norm1 = nn.LayerNorm(embed_dim)
+        self.layer_norm2 = nn.LayerNorm(embed_dim)
+        self.layer_norm3 = nn.LayerNorm(embed_dim)
+        self.ffn = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim),
+            nn.ReLU(),
+            nn.Linear(embed_dim, embed_dim),
+        )
+
+    def forward(self, queries, pos_encodings, memory):
+        x_att, _ = self.mhsa1(queries, queries, queries)
+        x_mid = x_att + queries
+        x_mid = self.layer_norm1(x_mid)
+
+        k2 = memory + pos_encodings
+        v2 = memory
+        q2 = queries + x_mid
+        x_att2, _ = self.mhsa2(q2, k2, v2)
+
+        x_mid2 = x_att2 + x_mid
+        x_mid2 = self.layer_norm2(x_mid2)
+
+        x_ffn = self.ffn(x_mid2)
+        x_ffn = x_ffn + x_mid2
+        x_ffn = self.layer_norm3(x_ffn)
+        return x_ffn
+
+
+class Decoder(nn.Module):
+    def __init__(self, embed_dim, n_heads, n_layers):
+        super().__init__()
+        self.n_layers = n_layers
+        self.decoder_blocks = [DecoderBlock(embed_dim, n_heads) for _ in range(n_layers)]
+
+    def forward(self, queries, memory, pos_encodings):
+        for block in self.decoder_blocks:
+            queries = block(queries, memory, pos_encodings)
+        return queries
 
 
 class DETRModelDYI(BaseModel):
