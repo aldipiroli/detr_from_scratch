@@ -1,6 +1,38 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision.models as models
+
+
+class ResNet18Backbone(nn.Module):
+    def __init__(self, pretrained=False, normalize_output=True):
+        super().__init__()
+        # https://github.com/pytorch/vision/blob/main/torchvision/models/resnet.py
+        resnet = models.resnet18(pretrained=pretrained)
+
+        self.conv1 = resnet.conv1
+        self.bn1 = resnet.bn1
+        self.relu = resnet.relu
+        self.maxpool = resnet.maxpool
+
+        self.layer1 = resnet.layer1
+        self.layer2 = resnet.layer2
+        self.layer3 = resnet.layer3
+        self.layer4 = resnet.layer4
+        self.avgpool = resnet.avgpool
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        # Residual stages
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        return x
 
 
 class BaseModel(nn.Module):
@@ -13,7 +45,46 @@ class BaseModel(nn.Module):
 class DetrModel(BaseModel):
     def __init__(self, config):
         super().__init__(config)
-        self.l1 = nn.Linear(1, 1)
+        self.d = config["MODEL"]["d"]
+        self.n_patches = config["MODEL"]["n_patches"]
+        self.enc_n_heads = config["MODEL"]["enc_n_heads"]
+        self.enc_n_layers = config["MODEL"]["enc_n_layers"]
+        self.dec_n_heads = config["MODEL"]["dec_n_heads"]
+        self.dec_n_layers = config["MODEL"]["dec_n_layers"]
+        self.dec_n_queries = config["MODEL"]["dec_n_queries"]
+
+        # Backbone
+        self.backbone = ResNet18Backbone()
+        self.feat_reduction = nn.Conv2d(512, self.d, 1)
+
+        # Encoder
+        self.positional_embeddings = nn.Parameter(torch.rand(1, self.d, self.n_patches))
+
+        encoder_layer = nn.TransformerEncoderLayer(d_model=self.d, nhead=self.enc_n_heads)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=self.enc_n_layers)
+
+        # Decoder
+        decoder_layer = nn.TransformerDecoderLayer(d_model=self.d, nhead=self.dec_n_heads)
+        self.transformer_decoder = nn.TransformerDecoder(decoder_layer, num_layers=self.dec_n_layers)
+        self.obj_queries = nn.Parameter(torch.rand(self.dec_n_queries, 1, self.d))
+
+        # FC layer
+        self.box_head = nn.Sequential(nn.Linear(self.d, self.d), nn.ReLU(), nn.Linear(self.d, 4))
+        self.cls_head = nn.Sequential(nn.Linear(self.d, self.d), nn.ReLU(), nn.Linear(self.d, 1))
 
     def forward(self, x):
-        return x
+        B = x.shape[0]
+        x = self.backbone(x)
+        x = self.feat_reduction(x)
+        x = x.flatten(2, 3)  # B, d, HW
+        x = x + self.positional_embeddings.repeat(B, 1, 1)
+        x = x.permute(2, 0, 1)  # HW, B, d
+        x = self.transformer_encoder(x)
+
+        queries = self.obj_queries.repeat(1, B, 1)
+        x = self.transformer_decoder(queries, x)  # n_queries, B, d
+        x = x.permute(1, 0, 2)  # B, n_queries, d
+
+        boxes = self.box_head(x)
+        cls = self.cls_head(x)
+        return boxes, cls

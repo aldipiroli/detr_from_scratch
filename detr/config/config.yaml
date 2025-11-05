@@ -1,6 +1,13 @@
 ARTIFACTS_DIR: "artifacts"
 MODEL:
   MODEL_CONFIG: 1
+  d: 128
+  n_patches: 64
+  enc_n_heads: 4
+  enc_n_layers: 2
+  dec_n_heads: 4
+  dec_n_layers: 2
+  dec_n_queries: 10
 DATA:
   root_dir: "data/"
   img_size: [256, 256]
