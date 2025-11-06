@@ -119,7 +119,7 @@ class Encoder(nn.Module):
     def __init__(self, embed_dim, n_heads, n_layers):
         super().__init__()
         self.n_layers = n_layers
-        self.encoder_blocks = [EncoderBlock(embed_dim, n_heads) for _ in range(n_layers)]
+        self.encoder_blocks = nn.ModuleList([EncoderBlock(embed_dim, n_heads) for _ in range(n_layers)])
 
     def forward(self, x, pos_encodings):
         for block in self.encoder_blocks:
@@ -167,7 +167,7 @@ class Decoder(nn.Module):
     def __init__(self, embed_dim, n_heads, n_layers):
         super().__init__()
         self.n_layers = n_layers
-        self.decoder_blocks = [DecoderBlock(embed_dim, n_heads) for _ in range(n_layers)]
+        self.decoder_blocks = nn.ModuleList([DecoderBlock(embed_dim, n_heads) for _ in range(n_layers)])
 
     def forward(self, queries, memory, pos_encodings):
         for block in self.decoder_blocks:
