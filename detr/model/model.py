@@ -4,10 +4,11 @@ import torchvision.models as models
 
 
 class ResNet18Backbone(nn.Module):
-    def __init__(self, pretrained=False, normalize_output=True):
+    def __init__(self, pretrained=True, trainable=False):
         super().__init__()
         # https://github.com/pytorch/vision/blob/main/torchvision/models/resnet.py
         resnet = models.resnet18(pretrained=pretrained)
+        self.trainable = trainable
 
         self.conv1 = resnet.conv1
         self.bn1 = resnet.bn1
@@ -18,9 +19,8 @@ class ResNet18Backbone(nn.Module):
         self.layer2 = resnet.layer2
         self.layer3 = resnet.layer3
         self.layer4 = resnet.layer4
-        self.avgpool = resnet.avgpool
 
-    def forward(self, x):
+    def forward_pass(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -31,6 +31,14 @@ class ResNet18Backbone(nn.Module):
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
+        return x
+
+    def forward(self, x):
+        if self.trainable:
+            x = self.forward_pass(x)
+        else:
+            with torch.no_grad():
+                x = self.forward_pass(x)
         return x
 
 

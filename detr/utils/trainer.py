@@ -35,7 +35,7 @@ class Trainer(TrainerBase):
                 {
                     "mode": "train",
                     "epoch": f"{self.epoch}/{self.config['OPTIM']['num_epochs']}",
-                    # "loss": loss.item(),
+                    "loss": loss.item(),
                 }
             )
         pbar.close()

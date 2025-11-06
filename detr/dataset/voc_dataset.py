@@ -88,6 +88,15 @@ class VOCDataset(Dataset):
         assert torch.all(gt_boxes[:, 1] + gt_boxes[:, 3] / 2 <= img_h), "Box y max out of bounds"
         return gt_boxes, labels
 
+    def normalize_boxes(self, gt_boxes):
+        gt_boxes[:, 0] /= self.img_size[0]
+        gt_boxes[:, 2] /= self.img_size[0]
+
+        gt_boxes[:, 1] /= self.img_size[1]
+        gt_boxes[:, 3] /= self.img_size[1]
+        assert (gt_boxes <= 1).all()
+        return gt_boxes
+
     def __getitem__(self, idx):
         img, target = self.dataset[idx]
         original_size = img.size

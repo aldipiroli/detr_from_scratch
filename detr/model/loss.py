@@ -26,14 +26,19 @@ class DetrLoss(BaseLoss):
     def forward(self, preds, targets):
         gt_boxes, gt_cls, gt_validity = self.get_targets(targets)
         assignments = self.find_optimal_assignment(preds[0], preds[1], gt_boxes, gt_validity)
-        loss = self.compute_loss(assignments, preds[0], preds[1], gt_boxes, gt_cls, gt_validity)
+        loss_cls, loss_box = self.compute_loss(assignments, preds[0], preds[1], gt_boxes, gt_cls, gt_validity)
+        total_loss = loss_cls + loss_box
 
         loss_dict = {}
-        loss_dict["loss"] = loss
-        return loss, loss_dict
+        loss_dict["loss_cls"] = loss_cls
+        loss_dict["loss_box"] = loss_box
+        loss_dict["total_loss"] = total_loss
+        return total_loss, loss_dict
 
     def compute_loss(self, assignments, pred_boxes, pred_cls, gt_boxes, gt_cls, gt_validity):
         B = pred_boxes.shape[0]
+        all_loss_cls = []
+        all_loss_box = []
         for batch_id in range(B):
             curr_assignment = assignments[batch_id]
             curr_pred_boxes = pred_boxes[batch_id]
@@ -43,6 +48,25 @@ class DetrLoss(BaseLoss):
             curr_gt_validity = gt_validity[batch_id]
 
             loss_cls = self.compute_cls_loss(curr_assignment, curr_pred_cls, curr_gt_cls, curr_gt_validity)
+            all_loss_cls.append(loss_cls)
+
+            loss_box = self.compute_box_loss(curr_assignment, curr_pred_boxes, curr_gt_boxes, curr_gt_validity)
+            all_loss_box.append(loss_box)
+        avg_loss_cls = torch.stack(all_loss_cls).mean()
+        avg_loss_box = torch.stack(all_loss_box).mean()
+        return avg_loss_cls, avg_loss_box
+
+    def compute_box_loss(self, curr_assignment, curr_pred_boxes, curr_gt_boxes, gt_validity):
+        gt_idx = curr_assignment[0]
+        pred_idx = curr_assignment[1]
+        gt_boxes = curr_gt_boxes[gt_idx]
+        gt_validity = gt_validity[gt_idx]
+        pred_boxes = curr_pred_boxes[pred_idx]
+        loss_box = self.compute_box_cost(pred_boxes, gt_boxes)
+
+        loss_box = loss_box[gt_validity]
+        loss_box = loss_box.mean()
+        return loss_box
 
     def compute_cls_loss(self, curr_assignment, pred_cls, gt_cls, gt_validity):
         gt_idx = curr_assignment[0]
@@ -107,19 +131,10 @@ class DetrLoss(BaseLoss):
             curr_gt_boxes = targets[batch_id]["boxes"]
             curr_gt_cls = targets[batch_id]["class_id"]
             N = self.get_n_elements(curr_gt_boxes)
-            gt_boxes[batch_id][:N] = curr_gt_boxes
-            gt_cls[batch_id][:N] = curr_gt_cls
+            gt_boxes[batch_id][:N] = curr_gt_boxes[:N]
+            gt_cls[batch_id][:N] = curr_gt_cls[:N]
             gt_validity[batch_id][:N] = torch.tensor(True).repeat(N)
         return gt_boxes, gt_cls, gt_validity
 
     def get_n_elements(self, elements):
         return min(len(elements), self.n_queries)
-
-
-###########################################
-import debugpy
-
-debugpy.listen(("localhost", 6001))
-print("Waiting for debugger attach...")
-debugpy.wait_for_client()
-###########################################
