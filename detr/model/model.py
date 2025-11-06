@@ -185,6 +185,7 @@ class DetrModelDYI(BaseModel):
         self.dec_n_heads = config["MODEL"]["dec_n_heads"]
         self.dec_n_layers = config["MODEL"]["dec_n_layers"]
         self.dec_n_queries = config["MODEL"]["dec_n_queries"]
+        self.n_classes = config["MODEL"]["n_classes"]
 
         self.backbone = ResNet18Backbone()
         self.feat_reduction = nn.Conv2d(512, self.d, 1)
@@ -195,7 +196,7 @@ class DetrModelDYI(BaseModel):
         self.obj_queries = nn.Parameter(torch.rand(1, self.dec_n_queries, self.d))
 
         self.box_head = nn.Sequential(nn.Linear(self.d, self.d), nn.ReLU(), nn.Linear(self.d, 4))
-        self.cls_head = nn.Sequential(nn.Linear(self.d, self.d), nn.ReLU(), nn.Linear(self.d, 1))
+        self.cls_head = nn.Sequential(nn.Linear(self.d, self.d), nn.ReLU(), nn.Linear(self.d, self.n_classes))
 
     def forward(self, x):
         B = x.shape[0]

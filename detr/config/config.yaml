@@ -8,6 +8,7 @@ MODEL:
   dec_n_heads: 4
   dec_n_layers: 2
   dec_n_queries: 10
+  n_classes: 20
 DATA:
   root_dir: "data/"
   img_size: [256, 256]

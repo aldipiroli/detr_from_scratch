@@ -26,10 +26,9 @@ class Trainer(TrainerBase):
             preds = self.model(img)
             loss, loss_dict = self.loss_fn(preds, targets)
             self.write_dict_to_tb(loss_dict, self.total_iters_train, prefix="train")
-
-            # self.optimizer.zero_grad()
-            # loss.backward()
-            # self.optimizer.step()
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
 
             self.total_iters_train += 1
             pbar.set_postfix(
