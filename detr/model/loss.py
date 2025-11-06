@@ -1,5 +1,4 @@
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 class BaseLoss(nn.Module):
@@ -16,7 +15,7 @@ class DetrLoss(BaseLoss):
     def __init__(self, config, logger):
         super(DetrLoss, self).__init__(config, logger)
 
-    def forward(self, preds,targets):
+    def forward(self, preds, targets):
         loss = 0
 
         loss_dict = {}

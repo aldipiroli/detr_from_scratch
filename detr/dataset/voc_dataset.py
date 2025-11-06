@@ -6,7 +6,6 @@ from torch.utils.data import Dataset
 from torchvision import transforms, tv_tensors
 from torchvision.datasets import VOCDetection
 from torchvision.transforms import v2
-from detr.utils.plotters import plot_img_with_boxes
 
 
 class VOCDataset(Dataset):

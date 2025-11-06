@@ -4,7 +4,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import torch
 
-from detr.model.model import DetrModel, EncoderBlock, Encoder, DecoderBlock, Decoder, DetrModelDYI
+from detr.model.model import Decoder, DecoderBlock, DetrModel, DetrModelDYI, Encoder, EncoderBlock
 from detr.utils.misc import load_config
 
 

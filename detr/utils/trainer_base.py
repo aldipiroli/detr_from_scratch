@@ -5,8 +5,8 @@ import torch
 from torch.utils.data import DataLoader, Subset
 from torch.utils.tensorboard import SummaryWriter
 
-from detr.utils.misc import get_device
 from detr.dataset.voc_dataset import voc_collate_fn
+from detr.utils.misc import get_device
 
 
 class TrainerBase(ABC):

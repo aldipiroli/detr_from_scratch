@@ -1,8 +1,8 @@
 import argparse
 
 from detr.dataset.voc_dataset import VOCDataset
-from detr.model.model import DetrModel
 from detr.model.loss import DetrLoss
+from detr.model.model import DetrModelDYI
 from detr.utils.misc import get_logger, load_config, make_artifacts_dirs
 from detr.utils.trainer import Trainer
 
@@ -16,7 +16,7 @@ def train(args):
     train_dataset = VOCDataset(cfg=config, mode="train", logger=logger)
     val_dataset = VOCDataset(cfg=config, mode="val", logger=logger)
 
-    model = DetrModel(config)
+    model = DetrModelDYI(config)
     trainer.set_model(model)
 
     trainer.set_dataset(train_dataset, val_dataset, data_config=config["DATA"], val_set_batch_size=1)

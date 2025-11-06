@@ -1,8 +1,9 @@
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
-import detr.utils.misc as utils
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+
+import detr.utils.misc as utils
 
 
 def get_figure(fig):
