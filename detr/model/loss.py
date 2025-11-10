@@ -25,8 +25,9 @@ class DetrLoss(BaseLoss):
 
     def forward(self, preds, targets):
         gt_boxes, gt_cls, gt_validity = self.get_targets(targets)
-        assignments = self.find_optimal_assignment(preds[0], preds[1], gt_boxes, gt_validity)
-        loss_cls, loss_box = self.compute_loss(assignments, preds[0], preds[1], gt_boxes, gt_cls, gt_validity)
+        assignments = self.find_optimal_assignment(preds[0], preds[1], gt_boxes, gt_cls, gt_validity)
+        # loss_cls, loss_box = self.compute_loss(assignments, preds[0], preds[1], gt_boxes, gt_cls, gt_validity)
+        loss_cls, loss_box = 0, 0
         total_loss = loss_cls + loss_box
 
         loss_dict = {}
@@ -34,6 +35,30 @@ class DetrLoss(BaseLoss):
         loss_dict["loss_box"] = loss_box
         loss_dict["total_loss"] = total_loss
         return total_loss, loss_dict
+
+    @torch.no_grad()
+    def find_optimal_assignment(self, pred_boxes, pred_cls, gt_boxes, gt_cls, gt_validity):
+        B = pred_boxes.shape[0]
+        l1_weight = self.config["ASSIGNMENT"]["l1_weight"]
+        giou_weight = self.config["ASSIGNMENT"]["giou_weight"]
+        all_assignments = []
+        for batch_id in range(B):
+            curr_pred_boxes = pred_boxes[batch_id]
+            curr_pred_cls = pred_cls[batch_id].softmax(-1)
+            curr_gt_boxes = gt_boxes[batch_id].to(get_device())
+            curr_gt_cls = gt_cls[batch_id].to(get_device())
+            curr_gt_validity = gt_validity[batch_id]
+            if sum(curr_gt_validity) == 0:
+                all_assignments.append(([], []))
+                continue
+
+            cls_cost = -curr_pred_cls[:, curr_gt_cls.int()][:, curr_gt_validity]
+            giou_cost = 1 - torchvision.ops.generalized_box_iou(curr_pred_boxes, curr_gt_boxes[curr_gt_validity])
+            l1_cost = torch.cdist(curr_pred_boxes, curr_gt_boxes[curr_gt_validity])
+            cost_matrix = cls_cost + (giou_weight * giou_cost) + (l1_weight * l1_cost)
+            assignment = linear_sum_assignment(cost_matrix.cpu().detach().numpy())
+            all_assignments.append(assignment)
+        return all_assignments
 
     def compute_loss(self, assignments, pred_boxes, pred_cls, gt_boxes, gt_cls, gt_validity):
         B = pred_boxes.shape[0]
@@ -87,40 +112,6 @@ class DetrLoss(BaseLoss):
         weight[~gt_validity] *= self.invalid_weight
         return weight.to(get_device())
 
-    def find_optimal_assignment(self, pred_boxes, pred_cls, gt_boxes, gt_validity):
-        B = pred_boxes.shape[0]
-        all_assignments = []
-        for batch_id in range(B):
-            cost_matrix = torch.zeros((self.n_queries, self.n_queries))
-            curr_pred_boxes = pred_boxes[batch_id]
-            curr_pred_cls = pred_cls[batch_id]
-            curr_gt_boxes = gt_boxes[batch_id].to(get_device())
-            curr_gt_validity = gt_validity[batch_id]
-
-            for gt_idx in range(self.n_queries):
-                for pred_idx in range(self.n_queries):
-                    if curr_gt_validity[gt_idx]:
-                        cls_cost = -curr_pred_cls[pred_idx][gt_idx]
-                        box_cost = self.compute_box_cost(curr_pred_boxes[pred_idx], curr_gt_boxes[gt_idx])
-                        cost_matrix[gt_idx, pred_idx] = cls_cost + box_cost
-            assignment = linear_sum_assignment(cost_matrix.detach().numpy())
-            all_assignments.append(assignment)
-        return all_assignments
-
-    def compute_box_cost(self, pred_boxes, gt_boxes):
-        cost_l1 = self.compute_box_cost_l1(pred_boxes, gt_boxes)
-        cost_giou = self.compute_box_cost_GIoU(pred_boxes, gt_boxes)
-        cost_box = cost_l1 + cost_giou
-        return cost_box
-
-    def compute_box_cost_l1(self, pred_boxes, gt_boxes):
-        cost_l1 = nn.functional.l1_loss(pred_boxes, gt_boxes)
-        return cost_l1
-
-    def compute_box_cost_GIoU(self, pred_boxes, gt_boxes):
-        cost_giou = torchvision.ops.generalized_box_iou_loss(pred_boxes, gt_boxes)
-        return cost_giou
-
     def get_targets(self, targets):
         B = len(targets)
         gt_boxes = torch.zeros(B, self.n_queries, 4)
@@ -138,3 +129,12 @@ class DetrLoss(BaseLoss):
 
     def get_n_elements(self, elements):
         return min(len(elements), self.n_queries)
+
+
+###########################################
+import debugpy
+
+debugpy.listen(("localhost", 6001))
+print("Waiting for debugger attach...")
+debugpy.wait_for_client()
+###########################################
