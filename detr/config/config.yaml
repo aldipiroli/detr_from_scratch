@@ -9,10 +9,9 @@ MODEL:
   dec_n_layers: 2
   dec_n_queries: 10
   n_classes: 20
-LOSS:
+WEIGHTS:
   valid_weight: 1
   invalid_weight: 0.1
-ASSIGNMENT:
   l1_weight: 1
   giou_weight: 1
 DATA:

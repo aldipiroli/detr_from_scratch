@@ -66,3 +66,17 @@ def get_logger(log_dir):
         ch.setFormatter(formatter)
         logger.addHandler(ch)
     return logger
+
+
+def normalize_boxes(boxes, img_w, img_h):
+    norm_boxes = boxes.clone()
+    norm_boxes[:, [0, 2]] /= img_w
+    norm_boxes[:, [1, 3]] /= img_h
+    return norm_boxes
+
+
+def rescale_boxes(boxes, img_w, img_h):
+    scaled_boxes = boxes.clone()
+    scaled_boxes[:, [0, 2]] *= img_w
+    scaled_boxes[:, [1, 3]] *= img_h
+    return scaled_boxes

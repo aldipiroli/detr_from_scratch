@@ -7,6 +7,8 @@ from torchvision import transforms, tv_tensors
 from torchvision.datasets import VOCDetection
 from torchvision.transforms import v2
 
+from detr.utils.misc import normalize_boxes
+
 
 class VOCDataset(Dataset):
     def __init__(self, cfg, mode, logger):
@@ -80,12 +82,7 @@ class VOCDataset(Dataset):
 
         labels = torch.tensor(labels, dtype=torch.long)
         gt_boxes = torch.tensor(gt_boxes, dtype=torch.float)
-        gt_boxes = convert_vertex_to_xyhw(gt_boxes)
-
-        assert torch.all(gt_boxes[:, 0] - gt_boxes[:, 2] / 2 >= 0), "Box x min out of bounds"
-        assert torch.all(gt_boxes[:, 1] - gt_boxes[:, 3] / 2 >= 0), "Box y min out of bounds"
-        assert torch.all(gt_boxes[:, 0] + gt_boxes[:, 2] / 2 <= img_w), "Box x max out of bounds"
-        assert torch.all(gt_boxes[:, 1] + gt_boxes[:, 3] / 2 <= img_h), "Box y max out of bounds"
+        gt_boxes = normalize_boxes(gt_boxes, img_w=img_w, img_h=img_h)
         return gt_boxes, labels
 
     def normalize_boxes(self, gt_boxes):

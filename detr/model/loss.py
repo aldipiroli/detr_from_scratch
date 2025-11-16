@@ -20,14 +20,13 @@ class DetrLoss(BaseLoss):
     def __init__(self, config, logger):
         super(DetrLoss, self).__init__(config, logger)
         self.n_queries = config["MODEL"]["dec_n_queries"]
-        self.valid_weight = config["LOSS"]["valid_weight"]
-        self.invalid_weight = config["LOSS"]["invalid_weight"]
+        self.valid_weight = config["WEIGHTS"]["valid_weight"]
+        self.invalid_weight = config["WEIGHTS"]["invalid_weight"]
 
     def forward(self, preds, targets):
         gt_boxes, gt_cls, gt_validity = self.get_targets(targets)
         assignments = self.find_optimal_assignment(preds[0], preds[1], gt_boxes, gt_cls, gt_validity)
-        # loss_cls, loss_box = self.compute_loss(assignments, preds[0], preds[1], gt_boxes, gt_cls, gt_validity)
-        loss_cls, loss_box = 0, 0
+        loss_cls, loss_box = self.compute_loss(assignments, preds[0], preds[1], gt_boxes, gt_cls, gt_validity)
         total_loss = loss_cls + loss_box
 
         loss_dict = {}
@@ -39,8 +38,8 @@ class DetrLoss(BaseLoss):
     @torch.no_grad()
     def find_optimal_assignment(self, pred_boxes, pred_cls, gt_boxes, gt_cls, gt_validity):
         B = pred_boxes.shape[0]
-        l1_weight = self.config["ASSIGNMENT"]["l1_weight"]
-        giou_weight = self.config["ASSIGNMENT"]["giou_weight"]
+        l1_weight = self.config["WEIGHTS"]["l1_weight"]
+        giou_weight = self.config["WEIGHTS"]["giou_weight"]
         all_assignments = []
         for batch_id in range(B):
             curr_pred_boxes = pred_boxes[batch_id]
@@ -54,11 +53,18 @@ class DetrLoss(BaseLoss):
 
             cls_cost = -curr_pred_cls[:, curr_gt_cls.int()][:, curr_gt_validity]
             giou_cost = 1 - torchvision.ops.generalized_box_iou(curr_pred_boxes, curr_gt_boxes[curr_gt_validity])
-            l1_cost = torch.cdist(curr_pred_boxes, curr_gt_boxes[curr_gt_validity])
+            l1_cost = self.compute_cdist(curr_pred_boxes, curr_gt_boxes[curr_gt_validity])
             cost_matrix = cls_cost + (giou_weight * giou_cost) + (l1_weight * l1_cost)
             assignment = linear_sum_assignment(cost_matrix.cpu().detach().numpy())
             all_assignments.append(assignment)
         return all_assignments
+
+    def compute_cdist(self, x, y, p=1):
+        # can't use torch.cdist on metal
+        x_exp = x.unsqueeze(1)
+        y_exp = y.unsqueeze(0)
+        diff = x_exp - y_exp
+        return torch.sum(torch.abs(diff) ** p, dim=-1) ** (1.0 / p)
 
     def compute_loss(self, assignments, pred_boxes, pred_cls, gt_boxes, gt_cls, gt_validity):
         B = pred_boxes.shape[0]
@@ -87,29 +93,36 @@ class DetrLoss(BaseLoss):
         gt_boxes = curr_gt_boxes[gt_idx]
         gt_validity = gt_validity[gt_idx]
         pred_boxes = curr_pred_boxes[pred_idx]
-        loss_box = self.compute_box_cost(pred_boxes, gt_boxes)
 
+        giou_loss = torchvision.ops.generalized_box_iou_loss(self.sanitize_boxes(pred_boxes), gt_boxes)
+        l1_loss = self.compute_cdist(pred_boxes, gt_boxes)
+
+        loss_box = giou_loss + l1_loss
         loss_box = loss_box[gt_validity]
         loss_box = loss_box.mean()
         return loss_box
 
+    def sanitize_boxes(self, boxes):
+        x1 = torch.min(boxes[:, 0], boxes[:, 2])
+        y1 = torch.min(boxes[:, 1], boxes[:, 3])
+        x2 = torch.max(boxes[:, 0], boxes[:, 2])
+        y2 = torch.max(boxes[:, 1], boxes[:, 3])
+        boxes = torch.stack((x1, y1, x2, y2), dim=-1)
+        return boxes
+
     def compute_cls_loss(self, curr_assignment, pred_cls, gt_cls, gt_validity):
-        gt_idx = curr_assignment[0]
-        pred_idx = curr_assignment[1]
-        gt_cls = gt_cls[gt_idx]
-        gt_validity = gt_validity[gt_idx]
-        pred_cls = pred_cls[pred_idx]
+        pred_idx = curr_assignment[0]
 
         loss = nn.CrossEntropyLoss(reduction="none")
         loss_cls = loss(pred_cls, gt_cls)
-        weight = self.get_weighting(gt_validity)
+        weight = self.get_weighting(pred_idx)
         loss_cls = loss_cls * weight
         loss_cls = loss_cls.mean()
         return loss_cls
 
-    def get_weighting(self, gt_validity):
-        weight = torch.ones(self.n_queries) * self.valid_weight
-        weight[~gt_validity] *= self.invalid_weight
+    def get_weighting(self, pred_idx):
+        weight = torch.ones(self.n_queries) * self.invalid_weight
+        weight[pred_idx] = self.valid_weight
         return weight.to(get_device())
 
     def get_targets(self, targets):
@@ -129,12 +142,3 @@ class DetrLoss(BaseLoss):
 
     def get_n_elements(self, elements):
         return min(len(elements), self.n_queries)
-
-
-###########################################
-import debugpy
-
-debugpy.listen(("localhost", 6001))
-print("Waiting for debugger attach...")
-debugpy.wait_for_client()
-###########################################
