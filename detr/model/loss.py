@@ -88,8 +88,8 @@ class DetrLoss(BaseLoss):
         return avg_loss_cls, avg_loss_box
 
     def compute_box_loss(self, curr_assignment, curr_pred_boxes, curr_gt_boxes, gt_validity):
-        gt_idx = curr_assignment[0]
-        pred_idx = curr_assignment[1]
+        gt_idx = curr_assignment[1]
+        pred_idx = curr_assignment[0]
         gt_boxes = curr_gt_boxes[gt_idx]
         gt_validity = gt_validity[gt_idx]
         pred_boxes = curr_pred_boxes[pred_idx]

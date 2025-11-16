@@ -152,8 +152,8 @@ class DecoderBlock(nn.Module):
             nn.Linear(embed_dim, embed_dim),
         )
 
-    def forward(self, queries, pos_encodings, memory):
-        x_att, _ = self.mhsa1(queries, queries, queries)
+    def forward(self, queries, queries_pose_embedm, pos_encodings, memory):
+        x_att, _ = self.mhsa1(queries + queries_pose_embedm, queries + queries_pose_embedm, queries)
         x_mid = x_att + queries
         x_mid = self.layer_norm1(x_mid)
 
@@ -177,9 +177,9 @@ class Decoder(nn.Module):
         self.n_layers = n_layers
         self.decoder_blocks = nn.ModuleList([DecoderBlock(embed_dim, n_heads) for _ in range(n_layers)])
 
-    def forward(self, queries, memory, pos_encodings):
+    def forward(self, queries, queries_pose_embed, memory, pos_encodings):
         for block in self.decoder_blocks:
-            queries = block(queries, memory, pos_encodings)
+            queries = block(queries, queries_pose_embed, pos_encodings, memory)
         return queries
 
 
@@ -202,9 +202,12 @@ class DetrModelDYI(BaseModel):
         self.decoder = Decoder(self.d, self.dec_n_heads, self.dec_n_layers)
         self.positional_embeddings = nn.Parameter(torch.rand(1, self.n_patches, self.d))
         self.obj_queries = nn.Parameter(torch.rand(1, self.dec_n_queries, self.d))
+        self.query_pos_embed = nn.Parameter(torch.rand(1, self.dec_n_queries, self.d))
 
         self.box_head = nn.Sequential(nn.Linear(self.d, self.d), nn.ReLU(), nn.Linear(self.d, 4))
-        self.cls_head = nn.Sequential(nn.Linear(self.d, self.d), nn.ReLU(), nn.Linear(self.d, self.n_classes))
+        self.cls_head = nn.Sequential(
+            nn.Linear(self.d, self.d), nn.ReLU(), nn.Linear(self.d, self.n_classes + 1)
+        )  # +1 for no object
 
     def forward(self, x):
         B = x.shape[0]
@@ -216,7 +219,8 @@ class DetrModelDYI(BaseModel):
         memory = self.encoder(x, pose_embed)
 
         queries = self.obj_queries.repeat(B, 1, 1)
-        x = self.decoder(queries, memory, pose_embed)
+        queries_pose_embed = self.query_pos_embed.repeat(B, 1, 1)
+        x = self.decoder(queries, queries_pose_embed, memory, pose_embed)
 
         boxes = self.box_head(x)
         cls = self.cls_head(x)

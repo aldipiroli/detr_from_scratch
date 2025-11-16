@@ -1,9 +1,23 @@
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
 import detr.utils.misc as utils
+
+
+def convert_vertex_to_xyhw(boxes):
+    xmin = boxes[..., 0]
+    ymin = boxes[..., 1]
+    xmax = boxes[..., 2]
+    ymax = boxes[..., 3]
+
+    c_x = (xmin + xmax) / 2
+    c_y = (ymin + ymax) / 2
+    w = xmax - xmin
+    h = ymax - ymin
+    return torch.stack([c_x, c_y, w, h], dim=-1)
 
 
 def get_figure(fig):
@@ -21,7 +35,7 @@ def plot_boxes(boxes, ax, color="lime", linewidth=3):
         x, y, w, h = box
         x0 = x - w / 2
         y0 = y - h / 2
-        rect = patches.Rectangle((x0, y0), w, h, linewidth=linewidth, edgecolor=color, facecolor="none")
+        rect = patches.Rectangle((x0, y0), h, w, linewidth=linewidth, edgecolor=color, facecolor="none")
         ax.add_patch(rect)
 
 
@@ -29,8 +43,8 @@ def plot_img_with_boxes(image, gt_boxes=None, pred_boxes=None, output_path="tmp"
     if image.shape[0] == 3:
         image = image.permute(1, 2, 0)
     image = utils.to_cpu(image)
-    gt_boxes = utils.to_cpu(gt_boxes)
-    pred_boxes = utils.to_cpu(pred_boxes)
+    gt_boxes = utils.to_cpu(convert_vertex_to_xyhw(gt_boxes))
+    pred_boxes = utils.to_cpu(convert_vertex_to_xyhw(pred_boxes))
 
     # plot img
     fig = plt.figure(figsize=(10, 10))
