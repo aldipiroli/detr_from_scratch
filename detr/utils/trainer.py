@@ -1,6 +1,7 @@
 import torch
 from tqdm import tqdm
 
+from detr.utils.plotters import plot_img_with_boxes
 from detr.utils.trainer_base import TrainerBase
 
 
@@ -67,6 +68,16 @@ class Trainer(TrainerBase):
 
     def post_processor(self, preds):
         pred_boxes, pred_cls = preds
-        pred_cls = pred_cls.softmax(-1).argmax(-1)
-        valid_mask = pred_cls != (self.config["MODEL"]["n_classes"])
-        return pred_boxes[valid_mask], pred_cls[valid_mask]
+        B = pred_boxes.shape[0]
+
+        pred_cls_idx = pred_cls.softmax(-1).argmax(-1)
+        valid_mask = pred_cls_idx != self.config["MODEL"]["n_classes"]
+        out_boxes = []
+        out_labels = []
+        for b in range(B):
+            out_boxes.append(pred_boxes[b][valid_mask[b]])
+            out_labels.append(pred_cls_idx[b][valid_mask[b]])
+        return out_boxes, out_labels
+
+    def plot_predictions(self, img, targets, pred_boxes, batch=0):
+        plot_img_with_boxes(img[batch], targets[batch]["boxes"], pred_boxes[batch])
