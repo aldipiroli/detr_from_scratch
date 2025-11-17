@@ -21,7 +21,7 @@ class DetrLoss(BaseLoss):
         super(DetrLoss, self).__init__(config, logger)
         self.n_queries = config["MODEL"]["dec_n_queries"]
         self.n_classes = config["MODEL"]["n_classes"]
-        self.no_object_class_idx = self.n_classes + 1
+        self.no_object_class_idx = self.n_classes
 
         self.valid_weight = config["WEIGHTS"]["valid_weight"]
         self.invalid_weight = config["WEIGHTS"]["invalid_weight"]
