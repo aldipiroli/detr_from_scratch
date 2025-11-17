@@ -20,6 +20,9 @@ class DetrLoss(BaseLoss):
     def __init__(self, config, logger):
         super(DetrLoss, self).__init__(config, logger)
         self.n_queries = config["MODEL"]["dec_n_queries"]
+        self.n_classes = config["MODEL"]["n_classes"]
+        self.no_object_class_idx = self.n_classes + 1
+
         self.valid_weight = config["WEIGHTS"]["valid_weight"]
         self.invalid_weight = config["WEIGHTS"]["invalid_weight"]
 
@@ -78,7 +81,7 @@ class DetrLoss(BaseLoss):
             curr_gt_cls = gt_cls[batch_id].to(get_device())
             curr_gt_validity = gt_validity[batch_id]
 
-            loss_cls = self.compute_cls_loss(curr_assignment, curr_pred_cls, curr_gt_cls, curr_gt_validity)
+            loss_cls = self.compute_cls_loss(curr_assignment, curr_pred_cls, curr_gt_cls)
             all_loss_cls.append(loss_cls)
 
             loss_box = self.compute_box_loss(curr_assignment, curr_pred_boxes, curr_gt_boxes, curr_gt_validity)
@@ -95,10 +98,9 @@ class DetrLoss(BaseLoss):
         pred_boxes = curr_pred_boxes[pred_idx]
 
         giou_loss = torchvision.ops.generalized_box_iou_loss(self.sanitize_boxes(pred_boxes), gt_boxes)
-        l1_loss = self.compute_cdist(pred_boxes, gt_boxes)
+        l1_loss = torch.abs(pred_boxes - gt_boxes).sum(dim=-1).mean()
 
         loss_box = giou_loss + l1_loss
-        loss_box = loss_box[gt_validity]
         loss_box = loss_box.mean()
         return loss_box
 
@@ -110,25 +112,27 @@ class DetrLoss(BaseLoss):
         boxes = torch.stack((x1, y1, x2, y2), dim=-1)
         return boxes
 
-    def compute_cls_loss(self, curr_assignment, pred_cls, gt_cls, gt_validity):
+    def compute_cls_loss(self, curr_assignment, pred_cls, gt_cls):
         pred_idx = curr_assignment[0]
+        gt_idx = curr_assignment[1]
+        target_classes = torch.full((pred_cls.shape[0],), self.no_object_class_idx).long().to(get_device())
 
-        loss = nn.CrossEntropyLoss(reduction="none")
-        loss_cls = loss(pred_cls, gt_cls)
-        weight = self.get_weighting(pred_idx)
-        loss_cls = loss_cls * weight
-        loss_cls = loss_cls.mean()
-        return loss_cls
+        matched_gt_cls = gt_cls[gt_idx]
+        target_classes[pred_idx] = matched_gt_cls
 
-    def get_weighting(self, pred_idx):
-        weight = torch.ones(self.n_queries) * self.invalid_weight
-        weight[pred_idx] = self.valid_weight
-        return weight.to(get_device())
+        loss_fn = nn.CrossEntropyLoss(reduction="none")
+        loss_cls = loss_fn(pred_cls, target_classes)
+
+        weight_no_object = (target_classes == self.no_object_class_idx) * self.invalid_weight
+        weight_valid_object = (target_classes != self.no_object_class_idx) * self.valid_weight
+        weight = weight_no_object + weight_valid_object
+        loss_cls *= weight
+        return loss_cls.mean()
 
     def get_targets(self, targets):
         B = len(targets)
         gt_boxes = torch.zeros(B, self.n_queries, 4)
-        gt_cls = torch.zeros(B, self.n_queries)
+        gt_cls = torch.zeros(B, self.n_queries).long()
         gt_validity = torch.zeros(B, self.n_queries).bool()
 
         for batch_id in range(len(targets)):
