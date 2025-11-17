@@ -7,8 +7,6 @@ from torchvision import transforms, tv_tensors
 from torchvision.datasets import VOCDetection
 from torchvision.transforms import v2
 
-from detr.utils.misc import normalize_boxes
-
 
 class VOCDataset(Dataset):
     def __init__(self, cfg, mode, logger):
@@ -82,19 +80,10 @@ class VOCDataset(Dataset):
 
         labels = torch.tensor(labels, dtype=torch.long)
         gt_boxes = torch.tensor(gt_boxes, dtype=torch.float)
-        gt_boxes = normalize_boxes(gt_boxes, img_w=img_w, img_h=img_h)
         return gt_boxes, labels
 
-    def normalize_boxes(self, gt_boxes):
-        gt_boxes[:, 0] /= self.img_size[0]
-        gt_boxes[:, 2] /= self.img_size[0]
-
-        gt_boxes[:, 1] /= self.img_size[1]
-        gt_boxes[:, 3] /= self.img_size[1]
-        assert (gt_boxes <= 1).all()
-        return gt_boxes
-
     def __getitem__(self, idx):
+        idx = 0
         img, target = self.dataset[idx]
         original_size = img.size
 
@@ -105,19 +94,6 @@ class VOCDataset(Dataset):
         gt_boxes = tv_tensors.BoundingBoxes(gt_boxes, format="XYWH", canvas_size=(original_size[1], original_size[0]))
         img, gt_boxes = resize(img, gt_boxes)
         return img, gt_boxes, labels
-
-
-def convert_vertex_to_xyhw(boxes):
-    xmin = boxes[..., 0]
-    ymin = boxes[..., 1]
-    xmax = boxes[..., 2]
-    ymax = boxes[..., 3]
-
-    c_x = (xmin + xmax) / 2
-    c_y = (ymin + ymax) / 2
-    w = xmax - xmin
-    h = ymax - ymin
-    return torch.stack([c_x, c_y, w, h], dim=-1)
 
 
 def voc_collate_fn(batch):

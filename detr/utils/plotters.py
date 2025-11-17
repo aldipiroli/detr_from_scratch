@@ -43,8 +43,6 @@ def plot_img_with_boxes(image, gt_boxes=None, pred_boxes=None, output_path="tmp"
     if image.shape[0] == 3:
         image = image.permute(1, 2, 0)
     image = utils.to_cpu(image)
-    gt_boxes = utils.to_cpu(convert_vertex_to_xyhw(gt_boxes))
-    pred_boxes = utils.to_cpu(convert_vertex_to_xyhw(pred_boxes))
 
     # plot img
     fig = plt.figure(figsize=(10, 10))
@@ -53,9 +51,11 @@ def plot_img_with_boxes(image, gt_boxes=None, pred_boxes=None, output_path="tmp"
 
     # plot boxes
     if gt_boxes is not None:
+        gt_boxes = utils.to_cpu(convert_vertex_to_xyhw(gt_boxes))
         plot_boxes(gt_boxes, ax, color="lime")
 
     if pred_boxes is not None:
+        pred_boxes = utils.to_cpu(convert_vertex_to_xyhw(pred_boxes))
         plot_boxes(pred_boxes, ax, color="red")
 
     if return_figure:

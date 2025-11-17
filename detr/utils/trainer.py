@@ -24,6 +24,7 @@ class Trainer(TrainerBase):
         for n_iter, (img, targets) in pbar:
             img = img.to(self.device)
             preds = self.model(img)
+            pred_boxes, pred_cls = self.post_processor(preds)
             loss, loss_dict = self.loss_fn(preds, targets)
             self.write_dict_to_tb(loss_dict, self.total_iters_train, prefix="train")
             self.optimizer.zero_grad()
@@ -63,3 +64,9 @@ class Trainer(TrainerBase):
             )
         self.write_float_to_tb(torch.mean(loss).item(), name="val/avg_loss", step=self.epoch)
         pbar.close()
+
+    def post_processor(self, preds):
+        pred_boxes, pred_cls = preds
+        pred_cls = pred_cls.softmax(-1).argmax(-1)
+        valid_mask = pred_cls != (self.config["MODEL"]["n_classes"])
+        return pred_boxes[valid_mask], pred_cls[valid_mask]
