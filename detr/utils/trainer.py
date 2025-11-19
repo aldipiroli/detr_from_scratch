@@ -69,7 +69,6 @@ class Trainer(TrainerBase):
         pbar.close()
 
     def post_processor(self, preds):
-        img_size = self.config["DATA"]["img_size"]
         pred_boxes, pred_cls = preds
         B = pred_boxes.shape[0]
 
@@ -78,13 +77,16 @@ class Trainer(TrainerBase):
         out_boxes = []
         out_labels = []
         for b in range(B):
-            curr_boxes = rescale_boxes(pred_boxes[b][valid_mask[b]], img_size[0], img_size[1])
+            curr_boxes = pred_boxes[b][valid_mask[b]]
             curr_cls = pred_cls_idx[b][valid_mask[b]]
             out_boxes.append(curr_boxes)
             out_labels.append(curr_cls)
         return out_boxes, out_labels
 
     def plot_predictions(self, img, targets, preds, batch=0, iter=0):
+        img_size = self.config["DATA"]["img_size"]
         pred_boxes, pred_cls = self.post_processor(preds)
-        imgs = plot_img_with_boxes(img[batch], targets[batch]["boxes"], pred_boxes[batch], return_figure=True)
+        gt_boxes = rescale_boxes(targets[batch]["boxes"], img_size[0], img_size[1])
+        pred_boxes = rescale_boxes(pred_boxes[batch], img_size[0], img_size[1])
+        imgs = plot_img_with_boxes(img[batch], gt_boxes, pred_boxes, return_figure=True)
         self.write_images_to_tb(imgs, self.total_iters_train, f"img/{str(iter).zfill(4)}")
