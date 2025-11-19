@@ -43,7 +43,7 @@ class TrainerBase(ABC):
             self.writer.add_scalar(f"{prefix}/{k}", value, step)
 
     def write_images_to_tb(self, img, step, prefix="img"):
-        self.writer.add_image(f"{prefix}/", img, step)
+        self.writer.add_image(f"{prefix}", img, step)
 
     def write_text_to_tb(self, text, name, step):
         self.writer.add_text(name, text, step)

@@ -83,7 +83,6 @@ class VOCDataset(Dataset):
         return gt_boxes, labels
 
     def __getitem__(self, idx):
-        idx = 0
         img, target = self.dataset[idx]
         original_size = img.size
 

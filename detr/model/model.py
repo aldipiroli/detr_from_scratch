@@ -194,8 +194,9 @@ class DetrModelDYI(BaseModel):
         self.dec_n_layers = config["MODEL"]["dec_n_layers"]
         self.dec_n_queries = config["MODEL"]["dec_n_queries"]
         self.n_classes = config["MODEL"]["n_classes"]
+        self.trainable_backbone = config["MODEL"]["trainable_backbone"]
 
-        self.backbone = ResNet18Backbone()
+        self.backbone = ResNet18Backbone(trainable=self.trainable_backbone)
         self.feat_reduction = nn.Conv2d(512, self.d, 1)
 
         self.encoder = Encoder(self.d, self.enc_n_heads, self.enc_n_layers)

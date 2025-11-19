@@ -35,7 +35,7 @@ def plot_boxes(boxes, ax, color="lime", linewidth=3):
         x, y, w, h = box
         x0 = x - w / 2
         y0 = y - h / 2
-        rect = patches.Rectangle((x0, y0), h, w, linewidth=linewidth, edgecolor=color, facecolor="none")
+        rect = patches.Rectangle((x0, y0), w, h, linewidth=linewidth, edgecolor=color, facecolor="none")
         ax.add_patch(rect)
 
 

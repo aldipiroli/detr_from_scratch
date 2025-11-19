@@ -25,7 +25,6 @@ class Trainer(TrainerBase):
         for n_iter, (img, targets) in pbar:
             img = img.to(self.device)
             preds = self.model(img)
-            pred_boxes, pred_cls = self.post_processor(preds)
             loss, loss_dict = self.loss_fn(preds, targets)
             self.write_dict_to_tb(loss_dict, self.total_iters_train, prefix="train")
             self.optimizer.zero_grad()
@@ -47,12 +46,15 @@ class Trainer(TrainerBase):
         self.model.eval()
         pbar = tqdm(enumerate(self.val_loader), total=len(self.val_loader))
         val_loss = []
-        for n_iter, (img, labels) in pbar:
+        for n_iter, (img, targets) in pbar:
             img = img.to(self.device)
-            labels = labels.to(self.device)
+            if n_iter > self.max_eval_iters:
+                break
 
             preds = self.model(img)
-            loss, loss_dict = self.loss_fn(preds, labels)
+            pred_boxes, pred_cls = self.post_processor(preds)
+            self.plot_predictions(img, targets, pred_boxes, iter=n_iter)
+            loss, loss_dict = self.loss_fn(preds, targets)
             val_loss.append(loss)
             self.write_dict_to_tb(loss_dict, self.total_iters_val, prefix="val")
             self.total_iters_val += 1
@@ -79,5 +81,6 @@ class Trainer(TrainerBase):
             out_labels.append(pred_cls_idx[b][valid_mask[b]])
         return out_boxes, out_labels
 
-    def plot_predictions(self, img, targets, pred_boxes, batch=0):
-        plot_img_with_boxes(img[batch], targets[batch]["boxes"], pred_boxes[batch])
+    def plot_predictions(self, img, targets, pred_boxes, batch=0, iter=0):
+        imgs = plot_img_with_boxes(img[batch], targets[batch]["boxes"], pred_boxes[batch], return_figure=True)
+        self.write_images_to_tb(imgs, self.total_iters_train, f"img/{str(iter).zfill(4)}")
