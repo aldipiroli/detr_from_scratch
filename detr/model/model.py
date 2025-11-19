@@ -141,8 +141,8 @@ class DecoderBlock(nn.Module):
         self.K = nn.Linear(embed_dim, embed_dim)
         self.Q = nn.Linear(embed_dim, embed_dim)
         self.V = nn.Linear(embed_dim, embed_dim)
-        self.mhsa1 = nn.MultiheadAttention(embed_dim, num_heads, batch_first=True)
-        self.mhsa2 = nn.MultiheadAttention(embed_dim, num_heads, batch_first=True)
+        self.self_attn = nn.MultiheadAttention(embed_dim, num_heads, batch_first=True)
+        self.cross_attn = nn.MultiheadAttention(embed_dim, num_heads, batch_first=True)
         self.layer_norm1 = nn.LayerNorm(embed_dim)
         self.layer_norm2 = nn.LayerNorm(embed_dim)
         self.layer_norm3 = nn.LayerNorm(embed_dim)
@@ -153,14 +153,14 @@ class DecoderBlock(nn.Module):
         )
 
     def forward(self, queries, queries_pose_embedm, pos_encodings, memory):
-        x_att, _ = self.mhsa1(queries + queries_pose_embedm, queries + queries_pose_embedm, queries)
+        x_att, _ = self.self_attn(queries + queries_pose_embedm, queries + queries_pose_embedm, queries)
         x_mid = x_att + queries
         x_mid = self.layer_norm1(x_mid)
 
         k2 = memory + pos_encodings
         v2 = memory
-        q2 = queries + x_mid
-        x_att2, _ = self.mhsa2(q2, k2, v2)
+        q2 = x_mid + queries_pose_embedm
+        x_att2, _ = self.cross_attn(q2, k2, v2)
 
         x_mid2 = x_att2 + x_mid
         x_mid2 = self.layer_norm2(x_mid2)
@@ -223,6 +223,6 @@ class DetrModelDYI(BaseModel):
         queries_pose_embed = self.query_pos_embed.repeat(B, 1, 1)
         x = self.decoder(queries, queries_pose_embed, memory, pose_embed)
 
-        boxes = self.box_head(x)
+        boxes = self.box_head(x).sigmoid()
         cls = self.cls_head(x)
         return boxes, cls
