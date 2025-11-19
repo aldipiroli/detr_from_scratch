@@ -1,6 +1,7 @@
 import torch
 from tqdm import tqdm
 
+from detr.utils.misc import rescale_boxes
 from detr.utils.plotters import plot_img_with_boxes
 from detr.utils.trainer_base import TrainerBase
 
@@ -52,8 +53,7 @@ class Trainer(TrainerBase):
                 break
 
             preds = self.model(img)
-            pred_boxes, pred_cls = self.post_processor(preds)
-            self.plot_predictions(img, targets, pred_boxes, iter=n_iter)
+            self.plot_predictions(img, targets, preds, iter=n_iter)
             loss, loss_dict = self.loss_fn(preds, targets)
             val_loss.append(loss)
             self.write_dict_to_tb(loss_dict, self.total_iters_val, prefix="val")
@@ -69,6 +69,7 @@ class Trainer(TrainerBase):
         pbar.close()
 
     def post_processor(self, preds):
+        img_size = self.config["DATA"]["img_size"]
         pred_boxes, pred_cls = preds
         B = pred_boxes.shape[0]
 
@@ -77,10 +78,13 @@ class Trainer(TrainerBase):
         out_boxes = []
         out_labels = []
         for b in range(B):
-            out_boxes.append(pred_boxes[b][valid_mask[b]])
-            out_labels.append(pred_cls_idx[b][valid_mask[b]])
+            curr_boxes = rescale_boxes(pred_boxes[b][valid_mask[b]], img_size[0], img_size[1])
+            curr_cls = pred_cls_idx[b][valid_mask[b]]
+            out_boxes.append(curr_boxes)
+            out_labels.append(curr_cls)
         return out_boxes, out_labels
 
-    def plot_predictions(self, img, targets, pred_boxes, batch=0, iter=0):
+    def plot_predictions(self, img, targets, preds, batch=0, iter=0):
+        pred_boxes, pred_cls = self.post_processor(preds)
         imgs = plot_img_with_boxes(img[batch], targets[batch]["boxes"], pred_boxes[batch], return_figure=True)
         self.write_images_to_tb(imgs, self.total_iters_train, f"img/{str(iter).zfill(4)}")

@@ -7,6 +7,8 @@ from torchvision import transforms, tv_tensors
 from torchvision.datasets import VOCDetection
 from torchvision.transforms import v2
 
+from detr.utils.misc import normalize_boxes
+
 
 class VOCDataset(Dataset):
     def __init__(self, cfg, mode, logger):
@@ -90,8 +92,9 @@ class VOCDataset(Dataset):
         gt_boxes, labels = self.get_gt_boxes(target)
 
         resize = v2.Resize((self.img_size[0], self.img_size[1]), antialias=True)
-        gt_boxes = tv_tensors.BoundingBoxes(gt_boxes, format="XYWH", canvas_size=(original_size[1], original_size[0]))
+        gt_boxes = tv_tensors.BoundingBoxes(gt_boxes, format="XYXY", canvas_size=(original_size[1], original_size[0]))
         img, gt_boxes = resize(img, gt_boxes)
+        gt_boxes = normalize_boxes(gt_boxes, self.img_size[0], self.img_size[1])
         return img, gt_boxes, labels
 
 
