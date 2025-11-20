@@ -25,11 +25,14 @@ def test_model_dyi():
     model = DetrModelDYI(config)
     img_size = config["DATA"]["img_size"]
     dec_n_queries = config["MODEL"]["dec_n_queries"]
+    n_patches = config["MODEL"]["n_patches"]
+    n_classes = config["MODEL"]["n_classes"]
     B, C, H, W = 2, 3, img_size[0], img_size[1]
     img = torch.randn(B, C, H, W)
-    boxes, cls = model(img)
+    boxes, cls, attn_weights = model(img)
     assert boxes.shape == (B, dec_n_queries, 4)
-    assert cls.shape == (B, dec_n_queries, 1)
+    assert cls.shape == (B, dec_n_queries, n_classes + 1)
+    assert attn_weights.shape == (B, dec_n_queries, n_patches)
 
 
 def test_encoder_block():
@@ -71,10 +74,12 @@ def test_decoder_block():
     decoder_block = DecoderBlock(embed_dim, n_heads)
 
     queries = torch.randn(B, n_queries, embed_dim)
+    queries_pose_embedm = torch.randn(B, n_queries, embed_dim)
     pos_encodings = torch.rand(B, n_patches, embed_dim)
     memory = torch.rand(B, n_patches, embed_dim)
-    out = decoder_block(queries, pos_encodings, memory)
+    out, cross_att_weights = decoder_block(queries, queries_pose_embedm, pos_encodings, memory)
     assert out.shape == (B, n_queries, embed_dim)
+    assert cross_att_weights.shape == (B, n_queries, n_patches)
 
 
 def test_decoder_layers():
@@ -90,9 +95,11 @@ def test_decoder_layers():
     memory = torch.randn(B, n_patches, embed_dim)
     pos_encodings = torch.rand(B, n_patches, embed_dim)
     queries = torch.randn(B, n_queries, embed_dim)
+    queries_pose_embedm = torch.randn(B, n_queries, embed_dim)
 
-    out = decoder(queries, memory, pos_encodings)
+    out, cross_att_weights = decoder(queries, queries_pose_embedm, memory, pos_encodings)
     assert out.shape == (B, n_queries, embed_dim)
+    assert cross_att_weights.shape == (B, n_queries, n_patches)
 
 
 if __name__ == "__main__":
