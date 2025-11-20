@@ -1,3 +1,4 @@
+import copy
 import logging
 import os
 from datetime import datetime
@@ -69,14 +70,17 @@ def get_logger(log_dir):
 
 
 def normalize_boxes(boxes, img_w, img_h):
-    norm_boxes = boxes.clone()
+    norm_boxes = copy.deepcopy(boxes)
     norm_boxes[:, [0, 2]] /= img_w
     norm_boxes[:, [1, 3]] /= img_h
     return norm_boxes
 
 
 def rescale_boxes(boxes, img_w, img_h):
-    scaled_boxes = boxes.clone()
-    scaled_boxes[:, [0, 2]] *= img_w
-    scaled_boxes[:, [1, 3]] *= img_h
+    if len(boxes) > 0:
+        scaled_boxes = copy.deepcopy(boxes)
+        scaled_boxes[:, [0, 2]] *= img_w
+        scaled_boxes[:, [1, 3]] *= img_h
+    else:
+        scaled_boxes = []
     return scaled_boxes

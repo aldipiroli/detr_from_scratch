@@ -1,4 +1,5 @@
 import torch
+import torchvision
 from tqdm import tqdm
 
 from detr.utils.misc import rescale_boxes
@@ -43,17 +44,14 @@ class Trainer(TrainerBase):
         pbar.close()
 
     @torch.no_grad()
-    def evaluate_model(self, save_plots=False):
+    def evaluate_model(self, save_plots=True):
         self.model.eval()
         pbar = tqdm(enumerate(self.val_loader), total=len(self.val_loader))
         val_loss = []
         for n_iter, (img, targets) in pbar:
             img = img.to(self.device)
-            if n_iter > self.max_eval_iters:
-                break
-
             preds = self.model(img)
-            self.plot_predictions(img, targets, preds, iter=n_iter)
+            self.plot_predictions(img, targets, preds, iter=n_iter, save_plots=save_plots)
             loss, loss_dict = self.loss_fn(preds, targets)
             val_loss.append(loss)
             self.write_dict_to_tb(loss_dict, self.total_iters_val, prefix="val")
@@ -72,21 +70,52 @@ class Trainer(TrainerBase):
         pred_boxes, pred_cls = preds
         B = pred_boxes.shape[0]
 
-        pred_cls_idx = pred_cls.softmax(-1).argmax(-1)
+        pred_cls_prob, pred_cls_idx = torch.max(pred_cls.softmax(-1), -1)
         valid_mask = pred_cls_idx != self.config["MODEL"]["n_classes"]
         out_boxes = []
-        out_labels = []
+        out_cls_idx = []
+        out_cls_prob = []
         for b in range(B):
             curr_boxes = pred_boxes[b][valid_mask[b]]
-            curr_cls = pred_cls_idx[b][valid_mask[b]]
+            curr_cls_idx = pred_cls_idx[b][valid_mask[b]]
+            curr_cls_prob = pred_cls_prob[b][valid_mask[b]]
+            curr_boxes, curr_cls_idx, curr_cls_prob = self.apply_nms(curr_boxes, curr_cls_idx, curr_cls_prob)
             out_boxes.append(curr_boxes)
-            out_labels.append(curr_cls)
-        return out_boxes, out_labels
+            out_cls_idx.append(curr_cls_idx)
+            out_cls_prob.append(curr_cls_prob)
+        return out_boxes, out_cls_idx, out_cls_prob
 
-    def plot_predictions(self, img, targets, preds, batch=0, iter=0):
+    def apply_nms(self, boxes, pred_cls_idx, pred_cls_prob, iou_threshold=0):
+        unique_ids = torch.unique(pred_cls_idx)
+        all_boxes = []
+        all_cls_idx = []
+        all_cls_prob = []
+        for curr_unique_id in unique_ids:
+            curr_maks = pred_cls_idx == curr_unique_id
+            selected_ids = torchvision.ops.nms(boxes[curr_maks], pred_cls_prob[curr_maks], iou_threshold)
+            all_boxes.append(boxes[curr_maks][selected_ids])
+            all_cls_idx.append(pred_cls_idx[curr_maks][selected_ids])
+            all_cls_prob.append(pred_cls_prob[curr_maks][selected_ids])
+        all_boxes = torch.cat(all_boxes, 0) if len(all_boxes) > 0 else []
+        all_cls_idx = torch.cat(all_cls_idx, 0) if len(all_cls_idx) > 0 else []
+        all_cls_prob = torch.cat(all_cls_prob, 0) if len(all_cls_prob) > 0 else []
+        return all_boxes, all_cls_idx, all_cls_prob
+
+    def plot_predictions(self, img, targets, preds, batch=0, iter=0, save_plots=False):
         img_size = self.config["DATA"]["img_size"]
-        pred_boxes, pred_cls = self.post_processor(preds)
+        pred_boxes, pred_cls_idx, pred_cls_prob = self.post_processor(preds)
         gt_boxes = rescale_boxes(targets[batch]["boxes"], img_size[0], img_size[1])
+        gt_class = targets[batch]["class_id"]
         pred_boxes = rescale_boxes(pred_boxes[batch], img_size[0], img_size[1])
-        imgs = plot_img_with_boxes(img[batch], gt_boxes, pred_boxes, return_figure=True)
-        self.write_images_to_tb(imgs, self.total_iters_train, f"img/{str(iter).zfill(4)}")
+        imgs = plot_img_with_boxes(
+            img[batch],
+            gt_boxes,
+            gt_class,
+            pred_boxes,
+            pred_cls_idx[batch],
+            pred_cls_prob[batch],
+            return_figure=False,
+            output_path=f'{self.config["IMG_OUT_DIR"]}/{str(iter).zfill(3)}.png',
+        )
+        if not save_plots:
+            self.write_images_to_tb(imgs, self.total_iters_train, f"img/{str(iter).zfill(4)}")
