@@ -160,7 +160,7 @@ class DecoderBlock(nn.Module):
         k2 = memory + pos_encodings
         v2 = memory
         q2 = x_mid + queries_pose_embedm
-        x_att2, _ = self.cross_attn(q2, k2, v2)
+        x_att2, cross_att_weights = self.cross_attn(q2, k2, v2)
 
         x_mid2 = x_att2 + x_mid
         x_mid2 = self.layer_norm2(x_mid2)
@@ -168,7 +168,7 @@ class DecoderBlock(nn.Module):
         x_ffn = self.ffn(x_mid2)
         x_ffn = x_ffn + x_mid2
         x_ffn = self.layer_norm3(x_ffn)
-        return x_ffn
+        return x_ffn, cross_att_weights
 
 
 class Decoder(nn.Module):
@@ -179,8 +179,8 @@ class Decoder(nn.Module):
 
     def forward(self, queries, queries_pose_embed, memory, pos_encodings):
         for block in self.decoder_blocks:
-            queries = block(queries, queries_pose_embed, pos_encodings, memory)
-        return queries
+            queries, cross_att_weights = block(queries, queries_pose_embed, pos_encodings, memory)
+        return queries, cross_att_weights
 
 
 class DetrModelDYI(BaseModel):
@@ -221,8 +221,8 @@ class DetrModelDYI(BaseModel):
 
         queries = self.obj_queries.repeat(B, 1, 1)
         queries_pose_embed = self.query_pos_embed.repeat(B, 1, 1)
-        x = self.decoder(queries, queries_pose_embed, memory, pose_embed)
+        x, cross_att_weights = self.decoder(queries, queries_pose_embed, memory, pose_embed)
 
         boxes = self.box_head(x).sigmoid()
         cls = self.cls_head(x)
-        return boxes, cls
+        return boxes, cls, cross_att_weights

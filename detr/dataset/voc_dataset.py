@@ -9,6 +9,31 @@ from torchvision.transforms import v2
 
 from detr.utils.misc import normalize_boxes
 
+CLASSES = [
+    "aeroplane",
+    "bicycle",
+    "bird",
+    "boat",
+    "bottle",
+    "bus",
+    "car",
+    "cat",
+    "chair",
+    "cow",
+    "diningtable",
+    "dog",
+    "horse",
+    "motorbike",
+    "person",
+    "pottedplant",
+    "sheep",
+    "sofa",
+    "train",
+    "tvmonitor",
+]
+CLASS_TO_IDX = {cls: i for i, cls in enumerate(CLASSES)}
+IDX_TO_CLASS = {v: k for k, v in CLASS_TO_IDX.items()}
+
 
 class VOCDataset(Dataset):
     def __init__(self, cfg, mode, logger):
@@ -31,30 +56,9 @@ class VOCDataset(Dataset):
         self.build_class_maps()
 
     def build_class_maps(self):
-        self.classes = [
-            "aeroplane",
-            "bicycle",
-            "bird",
-            "boat",
-            "bottle",
-            "bus",
-            "car",
-            "cat",
-            "chair",
-            "cow",
-            "diningtable",
-            "dog",
-            "horse",
-            "motorbike",
-            "person",
-            "pottedplant",
-            "sheep",
-            "sofa",
-            "train",
-            "tvmonitor",
-        ]
-        self.class_to_idx = {cls: i for i, cls in enumerate(self.classes)}
-        self.idx_to_class = {v: k for k, v in self.class_to_idx.items()}
+        self.classes = CLASSES
+        self.class_to_idx = CLASS_TO_IDX
+        self.idx_to_class = IDX_TO_CLASS
         self.num_classes = len(self.classes)
 
     def __len__(self):

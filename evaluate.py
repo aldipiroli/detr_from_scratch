@@ -21,7 +21,9 @@ def train(args):
     if args.ckpt is not None:
         trainer.load_checkpoint(args.ckpt)
 
-    trainer.set_dataset(train_dataset, val_dataset, data_config=config["DATA"], val_set_batch_size=1)
+    trainer.set_dataset(
+        train_dataset, val_dataset, data_config=config["DATA"], val_set_batch_size=1, shuffle_valset=True
+    )
     trainer.set_loss_function(DetrLoss(config, logger))
     trainer.evaluate_model(save_plots=True)
 
