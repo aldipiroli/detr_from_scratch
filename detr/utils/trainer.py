@@ -49,6 +49,8 @@ class Trainer(TrainerBase):
         pbar = tqdm(enumerate(self.val_loader), total=len(self.val_loader))
         val_loss = []
         for n_iter, (img, targets) in pbar:
+            if n_iter > self.max_eval_iters:
+                break
             img = img.to(self.device)
             preds = self.model(img)
             self.plot_predictions(
